@@ -122,12 +122,17 @@ def dqn_learing(
             return torch.IntTensor([[random.randrange(num_actions)]])
 
     # Initialize target q function and q function, i.e. build the model.
-    ######
+    # Check if GPU or CPU based run
+    device = torch.device('cpu')
+    if USE_CUDA:
+        print('Runining on GPU(CUDA)')
+        device = torch.device('cuda')
+    else:
+        print('Runining on CPU')
 
-    # YOUR CODE HERE
-
-    ######
-
+    # Define the Q functions (dqn_model - our neural network)
+    Q = q_func(input_arg,num_actions).to(device)
+    Q_target = q_func(input_arg, num_actions).to(device)
 
     # Construct Q network optimizer function
     optimizer = optimizer_spec.constructor(Q.parameters(), **optimizer_spec.kwargs)
