@@ -183,11 +183,23 @@ def dqn_learing(
         # And remember that the first time you enter this loop, the model
         # may not yet have been initialized (but of course, the first step
         # might as well be random, since you haven't trained your net...)
-        #####
 
-        # YOUR CODE HERE
+        # Push to buffer
+        last_obs_index = replay_buffer.store_frame(last_obs)
 
-        #####
+        # Get action include epsilon greedy exploration
+        encoded_recent_obs = replay_buffer.encode_recent_observation() / 255.0
+        action = select_epilson_greedy_action(Q, encoded_recent_obs, t)
+
+        # Step and store
+        obs, reward, is_done, details = env.step(action)
+        replay_buffer.store_effect(last_obs_index, action, reward, is_done)
+
+        # Done?
+        if is_done:
+            obs = env.reset()
+        last_obs = obs
+
 
         # at this point, the environment should have been advanced one step (and
         # reset if done was true), and last_obs should point to the new latest
@@ -221,11 +233,41 @@ def dqn_learing(
             #      target_Q network. see state_dict() and load_state_dict() methods.
             #      you should update every target_update_freq steps, and you may find the
             #      variable num_param_updates useful for this (it was initialized to 0)
-            #####
 
-            # YOUR CODE HERE
+            #  Use the replay buffer to sample a batch of transitions
+            obs_batch, act_batch, rew_batch, next_obs_batch, done_mask = replay_buffer.sample(batch_size)
 
-            #####
+            # Transform numpy array to torch tensors
+            tensor_obs_batch = torch.tensor(obs_batch, dtype=torch.float32, device=device)
+            tensor_next_obs_batch = torch.tensor(next_obs_batch, dtype=torch.float32, device=device)
+            tensor_rew_batch = torch.tensor(rew_batch, dtype=torch.float32, device=device)
+            tensor_act_batch = torch.tensor(act_batch, dtype=torch.int64, device=device)
+            tensor_not_done_mask = torch.tensor(1 - done_mask, dtype=torch.float32, device=device)
+
+            # Scale values
+            tensor_obs_batch = tensor_obs_batch / 255
+            tensor_next_obs_batch = tensor_next_obs_batch / 255
+
+            # Compute the Q_values
+            Q_values  = Q(tensor_obs_batch)[torch.arange(batch_size, device=device), tensor_act_batch].to(device)
+            Q_next = Q_target(tensor_next_obs_batch).detach().max(1)[0]
+            Q_next_values = tensor_not_done_mask * Q_next
+
+            # Compute error
+            phi_values = tensor_rew_batch + gamma * Q_next_values
+            d_error = phi_values - Q_values
+            d_error = d_error.clamp(-1, 1) * -1.0
+
+            # Training the model. use the bellman error
+            optimizer.zero_grad()
+            Q_values.backward(d_error.data)
+            optimizer.step()
+
+            # Periodically update the target network by loading the current Q network weights into the Q_target network
+            num_param_updates += 1
+            if num_param_updates % target_update_freq == 0:
+                Q_target.load_state_dict(Q.state_dict())
+
 
         ### 4. Log progress and keep track of statistics
         episode_rewards = get_wrapper_by_name(env, "Monitor").get_episode_rewards()
