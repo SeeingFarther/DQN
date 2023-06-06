@@ -17,14 +17,17 @@ import torch.autograd as autograd
 from utils.replay_buffer import ReplayBuffer
 from utils.gym import get_wrapper_by_name
 
+NETWORK_TYPE = "DQN"
 USE_CUDA = torch.cuda.is_available()
 dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
+
 
 class Variable(autograd.Variable):
     def __init__(self, data, *args, **kwargs):
         if USE_CUDA:
             data = data.cuda()
         super(Variable, self).__init__(data, *args, **kwargs)
+
 
 """
     OptimizerSpec containing following attributes
@@ -34,25 +37,29 @@ class Variable(autograd.Variable):
 OptimizerSpec = namedtuple("OptimizerSpec", ["constructor", "kwargs"])
 
 Statistic = {
+    "model": "",
     "mean_episode_rewards": [],
     "best_mean_episode_rewards": []
 }
 
-def dqn_learing(
-    env,
-    q_func,
-    optimizer_spec,
-    exploration,
-    stopping_criterion=None,
-    replay_buffer_size=1000000,
-    batch_size=32,
-    gamma=0.99,
-    learning_starts=50000,
-    learning_freq=4,
-    frame_history_len=4,
-    target_update_freq=10000
-    ):
 
+def dqn_learing(
+        env,
+        q_func,
+        optimizer_spec,
+        exploration,
+        stopping_criterion=None,
+        replay_buffer_size=1000000,
+        batch_size=32,
+        gamma=0.99,
+        learning_starts=50000,
+        learning_freq=4,
+        frame_history_len=4,
+        target_update_freq=10000,
+        agent = 'greedy',
+        std=0.05,
+        ddqn_flag = False
+):
     """Run Deep Q-learning algorithm.
 
     You can specify your own convnet using q_func.
@@ -95,7 +102,7 @@ def dqn_learing(
         each update to the target Q network
     """
     assert type(env.observation_space) == gym.spaces.Box
-    assert type(env.action_space)      == gym.spaces.Discrete
+    assert type(env.action_space) == gym.spaces.Discrete
 
     ###############
     # BUILD MODEL #
@@ -121,6 +128,21 @@ def dqn_learing(
         else:
             return torch.IntTensor([[random.randrange(num_actions)]])
 
+    def select_noisy_action(model, obs, t):
+        assert torch.__version__ >= '0.4.0'  # No need for volatile=True (or Variable...)
+
+        # Create fitting observation tensor
+        obs = torch.from_numpy(obs).type(dtype).unsqueeze(0) / 255.0
+        obs = model(Variable(obs).to(device))
+
+        # Choose action with noise
+        eps_threshold = exploration.value(t)
+        noise = torch.normal(mean=0, std=std * eps_threshold, size=obs.shape).to(device)
+        noisy = obs + noise
+        action = torch.argmax(noisy)
+
+        return action.reshape((1, 1)).to(device)
+
     # Initialize target q function and q function, i.e. build the model.
     # Check if GPU or CPU based run
     device = torch.device('cpu')
@@ -130,8 +152,10 @@ def dqn_learing(
     else:
         print('Runining on CPU')
 
+    NETWORK_TYPE = 'DQN' if not ddqn_flag else "DDQN"
+
     # Define the Q functions (dqn_model - our neural network)
-    Q = q_func(input_arg,num_actions).to(device)
+    Q = q_func(input_arg, num_actions).to(device)
     Q_target = q_func(input_arg, num_actions).to(device)
 
     # Construct Q network optimizer function
@@ -139,6 +163,13 @@ def dqn_learing(
 
     # Construct the replay buffer
     replay_buffer = ReplayBuffer(replay_buffer_size, frame_history_len)
+
+    # Choose agent
+    if agent == 'greedy':
+        select_action = select_epilson_greedy_action
+    else:
+        select_action = select_noisy_action
+
 
     ###############
     # RUN ENV     #
@@ -188,8 +219,8 @@ def dqn_learing(
         last_obs_index = replay_buffer.store_frame(last_obs)
 
         # Get action include epsilon greedy exploration
-        encoded_recent_obs = replay_buffer.encode_recent_observation() / 255.0
-        action = select_epilson_greedy_action(Q, encoded_recent_obs, t)
+        encoded_recent_obs = replay_buffer.encode_recent_observation()
+        action = select_action(Q, encoded_recent_obs, t)
 
         # Step and store
         obs, reward, is_done, details = env.step(action)
@@ -199,7 +230,6 @@ def dqn_learing(
         if is_done:
             obs = env.reset()
         last_obs = obs
-
 
         # at this point, the environment should have been advanced one step (and
         # reset if done was true), and last_obs should point to the new latest
@@ -238,23 +268,34 @@ def dqn_learing(
             obs_batch, act_batch, rew_batch, next_obs_batch, done_mask = replay_buffer.sample(batch_size)
 
             # Transform numpy array to torch tensors
-            tensor_obs_batch = torch.tensor(obs_batch, dtype=torch.float32, device=device)
-            tensor_next_obs_batch = torch.tensor(next_obs_batch, dtype=torch.float32, device=device)
-            tensor_rew_batch = torch.tensor(rew_batch, dtype=torch.float32, device=device)
-            tensor_act_batch = torch.tensor(act_batch, dtype=torch.int64, device=device)
-            tensor_not_done_mask = torch.tensor(1 - done_mask, dtype=torch.float32, device=device)
+            tensor_obs_batch = Variable(torch.from_numpy(obs_batch).type(dtype))
+            tensor_act_batch = Variable(torch.from_numpy(act_batch).type(dtype).long())
+            tensor_rew_batch = Variable(torch.from_numpy(rew_batch).type(dtype))
+            tensor_next_obs_batch = Variable(torch.from_numpy(next_obs_batch).type(dtype))
+            tensor_done_mask = Variable(torch.from_numpy(done_mask).type(dtype))
 
             # Scale values
-            tensor_obs_batch = tensor_obs_batch / 255
-            tensor_next_obs_batch = tensor_next_obs_batch / 255
+            tensor_obs_batch = tensor_obs_batch / 255.0
+            tensor_next_obs_batch = tensor_next_obs_batch / 255.0
 
             # Compute the Q_values
-            Q_values  = Q(tensor_obs_batch)[torch.arange(batch_size, device=device), tensor_act_batch].to(device)
-            Q_next = Q_target(tensor_next_obs_batch).detach().max(1)[0]
-            Q_next_values = tensor_not_done_mask * Q_next
+            Q_values = Q(tensor_obs_batch)[torch.arange(batch_size, device=device), tensor_act_batch].to(device)
+
+            # Double DQN?
+            if ddqn_flag:
+
+                # Get the Q values for best actions in tensor_next_obs_batch
+                _, best_next_action = Q(tensor_next_obs_batch).detach().q_tp1_values.max(1)
+
+                # Compute the Q_next
+                Q_target_next = Q_target(tensor_next_obs_batch).detach()
+                Q_next = Q_target_next.gather(1, best_next_action.unsqueeze(1))
+            else:
+                # Compute the Q_next
+                Q_next = Q_target(tensor_next_obs_batch).detach().max(1)[0]
 
             # Compute error
-            phi_values = tensor_rew_batch + gamma * Q_next_values
+            phi_values = tensor_rew_batch + gamma * (1 - tensor_done_mask) * Q_next
             d_error = phi_values - Q_values
             d_error = d_error.clamp(-1, 1) * -1.0
 
@@ -268,7 +309,6 @@ def dqn_learing(
             if num_param_updates % target_update_freq == 0:
                 Q_target.load_state_dict(Q.state_dict())
 
-
         ### 4. Log progress and keep track of statistics
         episode_rewards = get_wrapper_by_name(env, "Monitor").get_episode_rewards()
         if len(episode_rewards) > 0:
@@ -276,6 +316,7 @@ def dqn_learing(
         if len(episode_rewards) > 100:
             best_mean_episode_reward = max(best_mean_episode_reward, mean_episode_reward)
 
+        Statistic["model"] = NETWORK_TYPE
         Statistic["mean_episode_rewards"].append(mean_episode_reward)
         Statistic["best_mean_episode_rewards"].append(best_mean_episode_reward)
 
