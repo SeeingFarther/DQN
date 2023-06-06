@@ -279,17 +279,19 @@ def dqn_learing(
             tensor_next_obs_batch = tensor_next_obs_batch / 255.0
 
             # Compute the Q_values
-            Q_values = Q(tensor_obs_batch)[torch.arange(batch_size, device=device), tensor_act_batch].to(device)
+            Q_values = Q(tensor_obs_batch).gather(1, tensor_act_batch.unsqueeze(1))
+            Q_values = Q_values.squeeze()
 
             # Double DQN?
             if ddqn_flag:
 
                 # Get the Q values for best actions in tensor_next_obs_batch
-                _, best_next_action = Q(tensor_next_obs_batch).detach().q_tp1_values.max(1)
+                _, best_next_action = Q(tensor_next_obs_batch).detach().max(1)
 
                 # Compute the Q_next
                 Q_target_next = Q_target(tensor_next_obs_batch).detach()
                 Q_next = Q_target_next.gather(1, best_next_action.unsqueeze(1))
+                Q_next = Q_next.squeeze()
             else:
                 # Compute the Q_next
                 Q_next = Q_target(tensor_next_obs_batch).detach().max(1)[0]

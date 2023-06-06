@@ -54,7 +54,7 @@ class DQN_RAM(nn.Module):
 class DDQN(nn.Module):
     def __init__(self, in_channels=4, num_actions=18):
         super(DDQN, self).__init__()
-
+        self.num_actions = num_actions
         self.conv = nn.Sequential(
             nn.Conv2d(in_channels, 32, kernel_size=8, stride=4),
             nn.ReLU(),
@@ -65,23 +65,21 @@ class DDQN(nn.Module):
         )
 
         # Gets output size of layer first convolution layer
-        input_size = self.conv(autograd.Variable(zeros(1, *self.input_dim))).view(1, -1).size(1)
-
         self.linear_layer1 = nn.Sequential(
-            nn.Linear(input_size, 128),
+            nn.Linear(7*7*64, 512),
             nn.ReLU(),
-            nn.Linear(128, 1)
+            nn.Linear(512, 1)
         )
 
         self.linear_layer2 = nn.Sequential(
-            nn.Linear(input_size, 128),
+            nn.Linear(7*7*64, 512),
             nn.ReLU(),
-            nn.Linear(128, num_actions)
+            nn.Linear(512, num_actions)
         )
 
     def forward(self, x):
         batch_size = x.size()[0]
         x = self.conv(x).view(batch_size, -1)
-        actions = self.linear_layer1(x)
+        actions = self.linear_layer1(x).expand(x.size(0), self.num_actions)
         advantages = self.linear_layer2(x)
-        return actions + (advantages - advantages.mean())
+        return actions + (advantages - advantages.mean(1).unsqueeze(1).expand(x.size(0), self.num_actions))
