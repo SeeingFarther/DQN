@@ -58,7 +58,8 @@ def dqn_learing(
         target_update_freq=10000,
         agent = 'greedy',
         std=0.05,
-        ddqn_flag = False
+        ddqn_flag=False,
+        dueling_dqn_flag=False
 ):
     """Run Deep Q-learning algorithm.
 
@@ -153,6 +154,7 @@ def dqn_learing(
         print('Runining on CPU')
 
     NETWORK_TYPE = 'DQN' if not ddqn_flag else "DDQN"
+    NETWORK_TYPE = NETWORK_TYPE if not dueling_dqn_flag else "DuelingDQN"
 
     # Define the Q functions (dqn_model - our neural network)
     Q = q_func(input_arg, num_actions).to(device)

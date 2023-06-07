@@ -1,7 +1,7 @@
 import gym
 import torch.optim as optim
 
-from dqn_model import DQN, DDQN
+from dqn_model import DQN, DuelingDQN
 from dqn_learn import OptimizerSpec, dqn_learing
 from utils.gym import get_env, get_wrapper_by_name
 from utils.schedule import LinearSchedule
@@ -14,12 +14,13 @@ LEARNING_STARTS = 50000
 LEARNING_FREQ = 4
 FRAME_HISTORY_LEN = 4
 TARGER_UPDATE_FREQ = 10000
-LEARNING_RATE = 0.00020
+LEARNING_RATE = 0.00025
 ALPHA = 0.95
 EPS = 0.01
 AGENT = 'greedy'
 STD = 0.05
 DDQN_FLAG = False
+DuelingDQNFlag = False
 
 def main(env, num_timesteps):
     def stopping_criterion(env):
@@ -49,7 +50,8 @@ def main(env, num_timesteps):
         target_update_freq=TARGER_UPDATE_FREQ,
         agent=AGENT,
         std=STD,
-        ddqn_flag=DDQN_FLAG
+        ddqn_flag=DDQN_FLAG,
+        dueling_dqn_flag=DuelingDQNFlag
     )
 
 

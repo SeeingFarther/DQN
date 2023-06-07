@@ -49,11 +49,11 @@ class DQN_RAM(nn.Module):
         return self.fc4(x)
 
 
-# DDQN network based on the paper
-# https://arxiv.org/pdf/1509.06461.pdf
-class DDQN(nn.Module):
+# DuelingDQN network based on the paper
+# https://arxiv.org/pdf/1511.06581.pdf
+class DuelingDQN(nn.Module):
     def __init__(self, in_channels=4, num_actions=18):
-        super(DDQN, self).__init__()
+        super(DuelingDQN, self).__init__()
         self.num_actions = num_actions
         self.conv = nn.Sequential(
             nn.Conv2d(in_channels, 32, kernel_size=8, stride=4),
