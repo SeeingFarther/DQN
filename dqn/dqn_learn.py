@@ -56,10 +56,12 @@ def dqn_learing(
         learning_freq=4,
         frame_history_len=4,
         target_update_freq=10000,
-        agent = 'greedy',
-        std=0.05,
+        agent='greedy',
+        std=0.1,
+        beta=1,
         ddqn_flag=False,
         dueling_dqn_flag=False
+
 ):
     """Run Deep Q-learning algorithm.
 
@@ -144,6 +146,18 @@ def dqn_learing(
 
         return action.reshape((1, 1)).to(device)
 
+    def select_softmax_action(model, obs, t):
+
+        # Create fitting observation tensor
+        obs = torch.from_numpy(obs).type(dtype).unsqueeze(0) / 255.0
+        q_obs = model(Variable(obs).to(device)).detach().to(device)
+
+        # Choose action with noise
+        b_q_obs = beta * q_obs
+        probs = F.softmax(b_q_obs, dim=1).cpu()
+        sample = np.random.choice(range(probs.shape[1]), p=probs.numpy().reshape(-1))
+        return torch.IntTensor([[sample]]).to(device)
+
     # Initialize target q function and q function, i.e. build the model.
     # Check if GPU or CPU based run
     device = torch.device('cpu')
@@ -169,9 +183,12 @@ def dqn_learing(
     # Choose agent
     if agent == 'greedy':
         select_action = select_epilson_greedy_action
-    else:
+    elif agent == 'noisy':
         select_action = select_noisy_action
-
+    elif agent == 'softmax':
+        select_action = select_softmax_action
+    else:
+        raise ValueError('Invalid agent')
 
     ###############
     # RUN ENV     #
@@ -269,12 +286,12 @@ def dqn_learing(
             #  Use the replay buffer to sample a batch of transitions
             obs_batch, act_batch, rew_batch, next_obs_batch, done_mask = replay_buffer.sample(batch_size)
 
-            # Transform numpy array to torch tensors
-            tensor_obs_batch = Variable(torch.from_numpy(obs_batch).type(dtype))
-            tensor_act_batch = Variable(torch.from_numpy(act_batch).type(dtype).long())
-            tensor_rew_batch = Variable(torch.from_numpy(rew_batch).type(dtype))
-            tensor_next_obs_batch = Variable(torch.from_numpy(next_obs_batch).type(dtype))
-            tensor_done_mask = Variable(torch.from_numpy(done_mask).type(dtype))
+            # Transform numpy array to torch tensor
+            tensor_obs_batch = torch.from_numpy(obs_batch).type(dtype)
+            tensor_act_batch = torch.from_numpy(act_batch).type(dtype).long()
+            tensor_rew_batch = torch.from_numpy(rew_batch).type(dtype)
+            tensor_next_obs_batch = torch.from_numpy(next_obs_batch).type(dtype)
+            tensor_done_mask = torch.from_numpy(done_mask).type(dtype)
 
             # Scale values
             tensor_obs_batch = tensor_obs_batch / 255.0
@@ -283,12 +300,13 @@ def dqn_learing(
             # Compute the Q_values
             Q_values = Q(tensor_obs_batch).gather(1, tensor_act_batch.unsqueeze(1))
             Q_values = Q_values.squeeze()
+            Q_values = Q_values.to(device)
 
             # Double DQN?
             if ddqn_flag:
 
                 # Get the Q values for best actions in tensor_next_obs_batch
-                _, best_next_action = Q(tensor_next_obs_batch).detach().max(1)
+                best_next_action = Q(tensor_next_obs_batch).detach().max(1)[1]
 
                 # Compute the Q_next
                 Q_target_next = Q_target(tensor_next_obs_batch).detach()
@@ -297,6 +315,8 @@ def dqn_learing(
             else:
                 # Compute the Q_next
                 Q_next = Q_target(tensor_next_obs_batch).detach().max(1)[0]
+
+            Q_next = Q_next.to(device)
 
             # Compute error
             phi_values = tensor_rew_batch + gamma * (1 - tensor_done_mask) * Q_next
