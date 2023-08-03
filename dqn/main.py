@@ -19,7 +19,7 @@ ALPHA = 0.95
 EPS = 0.01
 AGENT = 'greedy'
 STD = 0.1
-BETA = 1
+BETA = 30
 DDQN_FLAG = False
 DuelingDQN_FLAG = False
 
