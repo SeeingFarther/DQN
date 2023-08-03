@@ -1,87 +1,106 @@
-# rl_project
+# RL Project
 
-Since argparse is part of the standard Python library, it should already be installed. However, if it’s not, you can install it using the follwing command:
-"pip install argparse"
+This repository contains code for a Reinforcement Learning project. The project includes an implementation of various RL algorithms and allows for easy customization of hyperparameters and agent configurations through command-line arguments.
 
-We have args you can run togther with the python command and by this choosing what the value of the hyperparamters on other variables:
-python main.py <args>
+## Installation
 
-1. To change replay buffer size, run with the following flag:
-python main.py --buffer <integer>
-For example to run with 5000000 replay buffer size:
+Since `argparse` is part of the standard Python library, it should already be installed. However, if it’s not, you can install it using the following command:
+
+pip install argparse
+
+## Usage
+
+To run the main script with different hyperparameter values, use the `python main.py` command along with the appropriate flags.
+
+### Hyperparameters:
+
+#### Replay Buffer Size
+To change the replay buffer size, use the `--buffer` flag. For example, to run with a replay buffer size of 5000000:
+
 python main.py --buffer 5000000
 
-2. To change size of the batch, run with the following flag:
-python main.py --batch <integer>
-For example to run with 32 batch size:
-python main.py --batch 32
 
-3. To change timestep when learning starts, run with the following flag:
-python main.py --learning_starts <integer>
-For example to run with 50000 timestep when learning starts:
+#### Batch Size
+To change the batch size, use the `--batch` flag. For example, to run with a batch size of 32:
+
 python main.py --learning_starts 50000
 
-4. To change updating weights frequency, run with the following flag:
-python main.py --learning_freq <integer>
-For example to run with 4 update frequency:
+
+#### Learning Frequency
+To change the updating weights frequency, use the `--learning_freq` flag. For example, to run with an update frequency of 4:
+
 python main.py --learning_freq 4
 
-5. To change length of history used, run with the following flag:
-python main.py --history_len <integer>
-For example to run with 5000 history length:
+
+#### History Length
+To change the length of history used, use the `--history_len` flag. For example, to run with a history length of 5000:
+
 python main.py --history_len 5000
 
-6. To change update target frequency, run with the following flag:
-python main.py --update_freq <integer>
-For example to run with 4 update frequency:
+
+#### Update Target Frequency
+To change the update target frequency, use the `--update_freq` flag. For example, to run with an update frequency of 4:
+
 python main.py --update_freq 4
 
-7. To change netork build, run with the following flag:
-python main.py --func <string>
-Choose between the following values:
-a. To run the normal dqn network =>   python main.py --func dqn
-b. To run the double dqn network =>   python main.py --func ddqn
-c. To run the dueling dqn network =>   python main.py --func duelingdqn
 
-8. To change gamma size, run with the following flag:
-python main.py --gamma <float>
-For example to run with 0.9 gamma size:
+#### Network Build
+To change the network build, use the `--func` flag. Choose between the following values:
+
+- To run the normal DQN network: `dqn`
+- To run the double DQN network: `ddqn`
+- To run the dueling DQN network: `duelingdqn`
+
+For example, to run with the double DQN network:
+
+python main.py --func ddqn
+
+
+#### Gamma Size
+To change the gamma size, use the `--gamma` flag. For example, to run with a gamma size of 0.9:
+
 python main.py --gamma 0.9
 
-9. To change alpha size, run with the following flag:
-python main.py --alpha <float>
-For example to run with 0.9 alpha size:
+
+#### Alpha Size
+To change the alpha size, use the `--alpha` flag. For example, to run with an alpha size of 0.9:
+
 python main.py --alpha 0.9
 
-10. To change learning rate, run with the following flag:
-python main.py --learning_rate <float>
-For example to run with 0.002 learning rate:
-python main.py --learning_rate 0.002
+#### Agent Type
+To change the agent, use the `--agent` flag. Choose between the following values:
 
-11. To change agent, run with the following flag:
-python main.py --agent <string>
-Choose between the following values:
-a. To run the greedy agent =>   python main.py --agent greedy
-b. To run the noisy agent =>   python main.py --agent noisy
-c. To run the softmax agent =>   python main.py --agent softmax
+- To run the greedy agent: `greedy`
+- To run the noisy agent: `noisy`
+- To run the softmax agent: `softmax`
 
-12. To change beta value for softmax agent, run with the following flag:
-python main.py --beta <float>
-For example to run with 0.002 beta:
+For example, to run with the softmax agent:
+
+python main.py --agent softmax
+
+
+#### Beta Value for Softmax Agent
+To change the beta value for the softmax agent, use the `--beta` flag. For example, to run with a beta value of 0.002:
+
 python main.py --beta 0.002
 
-13. To change standart deviation value for noisy agent, run with the following flag:
-python main.py --std <float>
-For example to run with 0.002 std:
+
+#### Standard Deviation Value for Noisy Agent
+To change the standard deviation value for the noisy agent, use the `--std` flag. For example, to run with a standard deviation of 0.002:
+
 python main.py --std 0.002
 
-14. To change epsilon, run with the following flag:
-python main.py --eps <float>
-For example to run with 0.002 eps:
+
+#### Epsilon
+To change epsilon, use the `--eps` flag. For example, to run with an epsilon value of 0.002:
+
 python main.py --eps 0.002
 
 
-Notice you can run multiply arguments for example for runing wint double dqn network and softmax agent with beta 9 we can run the following command:
-python main.py --func ddqn --softmax --beta 9
+### Multiple Arguments
+You can combine multiple arguments together. For example, to run with the double DQN network and softmax agent with beta 9:
+
+python main.py --func ddqn --agent softmax --beta 9
 
 
+Feel free to explore and customize the hyperparameters and agent configurations for your experiments. Happy Reinforcement Learning!
